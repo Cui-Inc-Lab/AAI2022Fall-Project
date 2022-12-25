@@ -53,20 +53,6 @@ def minmax_scale(x):
     return (x - x.min()) / (x.max() - x.min())
 
 
-def data_split(data, train_size=0.7, val_size=0.1):
-    num_samples = len(data)
-    split1 = int(num_samples * train_size)
-    split2 = int(num_samples * (train_size + val_size))
-
-    np.random.shuffle(data)
-
-    x_train = data[:split1]
-    x_val = data[split1:split2]
-    x_test = data[split2:]
-
-    return x_train, x_val, x_test
-
-
 def create_mfccs(data, mfcc_transformer):
     mfcc_list = []
     for waveform in data:
@@ -84,17 +70,26 @@ def create_mfccs(data, mfcc_transformer):
     return mfcc_list
 
 
-def shuffle_xy_totensor(x, y):
-    assert len(x) == len(y)
+def get_dataloaders(x, y, train_size=0.7, val_size=0.1, batch_size=32):
+    num_samples = x.shape[0]
+    split1 = int(num_samples * train_size)
+    split2 = int(num_samples * (train_size + val_size))
 
-    indices = np.random.permutation(np.arange(len(x)))
-    return torch.FloatTensor(x[indices]), torch.LongTensor(y[indices])
+    # shuffle
+    indices = np.random.permutation(np.arange(num_samples))
+    x = x[indices]
+    y = y[indices]
 
+    x = torch.FloatTensor(x)
+    y = torch.LongTensor(y)
 
-def get_dataloaders(x_train, x_val, x_test, y_train, y_val, y_test, batch_size=32):
-    x_train, y_train = shuffle_xy_totensor(x_train, y_train)
-    x_val, y_val = shuffle_xy_totensor(x_val, y_val)
-    x_test, y_test = shuffle_xy_totensor(x_test, y_test)
+    x_train = x[:split1]
+    x_val = x[split1:split2]
+    x_test = x[split2:]
+
+    y_train = y[:split1]
+    y_val = y[split1:split2]
+    y_test = y[split2:]
 
     print(f"Trainset:\tx-{x_train.size()}\ty-{y_train.size()}")
     print(f"Valset:  \tx-{x_val.size()}\ty-{y_val.size()}")
@@ -394,12 +389,16 @@ class SimpleCLS(nn.Module):
 
 
 if __name__ == "__main__":
-    num_speakers = 250 # 1~250
+    num_speakers = 100
     data_all = []
     for i in range(1, 1 + num_speakers):
         data_all.append(
             load_audio_files(f"../LibriSpeech-SI/train/spk{str(i).zfill(3)}/")
         )
+
+    # data_spk1 = load_audio_files("../LibriSpeech-SI/train/spk001/")
+    # data_spk2 = load_audio_files("../LibriSpeech-SI/train/spk002/")
+    # data_spk3 = load_audio_files("../LibriSpeech-SI/train/spk003/")
 
     audio_time = 3  # s
     offset_time = audio_time / 2  # s
@@ -419,30 +418,15 @@ if __name__ == "__main__":
         },
     )
 
-    x_train, x_val, x_test = [], [], []
-    y_train, y_val, y_test = [], [], []
+    xs = []
+    ys = []
     for i, data in enumerate(data_all):
-        x_train_i, x_val_i, x_test_i = data_split(data)
+        mfccs = create_mfccs(data, mfcc_transformer)
+        xs += mfccs
+        ys += [i] * len(mfccs)
 
-        mfccs_train = create_mfccs(x_train_i, mfcc_transformer)
-        mfccs_val = create_mfccs(x_val_i, mfcc_transformer)
-        mfccs_test = create_mfccs(x_test_i, mfcc_transformer)
-
-        x_train += mfccs_train
-        x_val += mfccs_val
-        x_test += mfccs_test
-
-        y_train += [i] * len(mfccs_train)
-        y_val += [i] * len(mfccs_val)
-        y_test += [i] * len(mfccs_test)
-
-    x_train = np.array(x_train)
-    x_val = np.array(x_val)
-    x_test = np.array(x_test)
-
-    y_train = np.array(y_train)
-    y_val = np.array(y_val)
-    y_test = np.array(y_test)
+    xs = np.array(xs)
+    ys = np.array(ys)
 
     batch_size = 32
     max_epochs = 100
@@ -450,7 +434,7 @@ if __name__ == "__main__":
     log_file = "temp.log"
 
     train_loader, val_loader, test_loader = get_dataloaders(
-        x_train, x_val, x_test, y_train, y_val, y_test, batch_size=batch_size
+        xs, ys, batch_size=batch_size, train_size=0.7, val_size=0.1
     )
 
     model = SimpleCLS(num_cls=num_speakers).to(DEVICE)
