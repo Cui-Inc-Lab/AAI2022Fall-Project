@@ -405,6 +405,6 @@ if __name__ == "__main__":
             file_list = [
                 os.path.join(test_path, file) for file in sorted(os.listdir(test_path))
             ]
-            predict(model_name, file_list, save_path="prediction.txt")
+            predict(model_name, file_list, save_path=f"{model_name}_prediction.txt")
     else:
         run(model_name, num_speakers=num_speakers)
