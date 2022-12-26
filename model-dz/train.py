@@ -284,7 +284,6 @@ def run(model_name: str, num_speakers=None):
             y[k] = np.array(v)
 
         print("Saving data to cache...")
-        # np.savez_compressed(file_path, x=x, y=y)
         torch.save({"x": x, "y": y}, file_path, pickle_protocol=4)
 
     train_loader, val_loader, test_loader = get_dataloaders(x, y, batch_size=batch_size)
@@ -343,6 +342,7 @@ def predict(model_name, file_list, save_path=None):
     param_path = f"./saved_model/{model._get_name()}_250_state_dict.pt"
     model.load_state_dict(torch.load(param_path))
     model = model.to(DEVICE)
+    model.eval()
 
     mfcc_transformer = torchaudio.transforms.MFCC(
         sample_rate=SAMPLE_RATE, **mfcc_kwargs
@@ -366,6 +366,7 @@ def predict(model_name, file_list, save_path=None):
         x = torch.stack(mfcc_list).to(DEVICE)
         y_pred = model(x)
         y_pred_decode = onehot_decode(y_pred).cpu().numpy()
+        # print(y_pred_decode)
         label_pred = np.argmax(np.bincount(y_pred_decode))
         pred_labels.append(label_pred + 1)
 
@@ -379,6 +380,10 @@ def predict(model_name, file_list, save_path=None):
 
 
 if __name__ == "__main__":
+    import warnings
+
+    warnings.filterwarnings("ignore")
+
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", type=str, required=True)
     parser.add_argument("-n", type=int, required=False, default=250)
