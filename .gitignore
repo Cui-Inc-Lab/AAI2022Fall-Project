@@ -132,4 +132,5 @@ temp*
 data/
 LibriSpeech-SI.tar.gz
 LibriSpeech-SI/
-data_cache/
+model-dz/data_cache/*.npz
+model-dz/data_cache/*.pkl
