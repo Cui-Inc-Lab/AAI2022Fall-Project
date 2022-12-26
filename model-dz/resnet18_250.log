@@ -1,0 +1,6 @@
+2022-12-26 12:56:13.798981
+Loading cached data...
+Trainset:	x-torch.Size([112777, 1, 224, 224])	y-torch.Size([112777])
+Valset:  	x-torch.Size([16534, 1, 224, 224])	y-torch.Size([16534])
+Testset:	x-torch.Size([33277, 1, 224, 224])	y-torch.Size([33277])
+------------- ResNet -------------

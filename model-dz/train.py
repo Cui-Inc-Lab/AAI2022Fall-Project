@@ -1,22 +1,18 @@
 import torch
 import torch.nn as nn
 import torchaudio
+import torchvision
 import numpy as np
 import datetime
 import matplotlib.pyplot as plt
 import os
+import argparse
 
 from utils import accuracy, load_audio_files, data_split, create_mfccs, get_dataloaders
 from mfcc_cnn import MFCCNN
 
 SAMPLE_RATE = 16000
 SEED = 23333
-
-if torch.cuda.is_available():
-    GPU_ID = 0
-    DEVICE = torch.device(f"cuda:{GPU_ID}")
-else:
-    DEVICE = torch.device("cpu")
 
 
 @torch.no_grad()
@@ -179,21 +175,60 @@ def train(
     return model
 
 
-if __name__ == "__main__":
-    num_speakers = 250  # 1~250
+def run(model_name: str, num_speakers=None):
+    print(datetime.datetime.now())
+
+    if not num_speakers:
+        num_speakers = 250  # 1~250
     batch_size = 64
     max_epochs = 100
     lr = 0.001
-    log_file = "temp.log"
+    log_file = None
+    # log_file = "temp.log"
 
-    print(datetime.datetime.now())
+    model_name = model_name.lower()
+    if model_name == "mfccnn":
+        model = MFCCNN(num_cls=num_speakers).to(DEVICE)
 
-    file_path = f"./data_cache/mfcc_{num_speakers}.npz"
+        file_path = f"./data_cache/mfcc_64_{num_speakers}.pkl"
+        mfcc_kwargs = {
+            "n_mfcc": 64,
+            "melkwargs": {
+                "n_fft": 750,
+                "hop_length": 750,
+                "n_mels": 64,
+                "center": False,
+                "normalized": True,
+            },
+        }
+    elif model_name == "resnet":
+        model = torchvision.models.resnet18(weights=None)
+        fc_features = model.fc.in_features
+        model.fc = nn.Linear(fc_features, num_speakers)
+        model.conv1 = nn.Conv2d(
+            1, 64, kernel_size=7, stride=2, padding=3, bias=False
+        )  # change to 1 channel input
+        model = model.to(DEVICE)
+
+        file_path = f"./data_cache/mfcc_224_{num_speakers}.pkl"
+        mfcc_kwargs = {
+            "n_mfcc": 224,
+            "melkwargs": {
+                "n_fft": 501,
+                "hop_length": 213,
+                "n_mels": 224,
+                "center": False,
+                "normalized": True,
+            },
+        }
+    else:
+        raise NotImplementedError
+
     if os.path.exists(file_path):
         print("Loading cached data...")
-        npz = np.load(file_path, allow_pickle=True)
-        x = npz["x"].item()
-        y = npz["y"].item()
+        data_dict = torch.load(file_path)
+        x = data_dict["x"]
+        y = data_dict["y"]
     else:
         data_all = []
         for i in range(1, 1 + num_speakers):
@@ -210,15 +245,7 @@ if __name__ == "__main__":
         offset = int(SAMPLE_RATE * offset_time)
 
         mfcc_transformer = torchaudio.transforms.MFCC(
-            sample_rate=SAMPLE_RATE,
-            n_mfcc=64,
-            melkwargs={
-                "n_fft": 750,
-                "hop_length": 750,
-                "n_mels": 64,
-                "center": False,
-                "normalized": True,
-            },
+            sample_rate=SAMPLE_RATE, **mfcc_kwargs
         )
 
         x = {"train": [], "val": [], "test": []}
@@ -244,11 +271,11 @@ if __name__ == "__main__":
             y[k] = np.array(v)
 
         print("Saving data to cache...")
-        np.savez(file_path, x=x, y=y)
+        # np.savez_compressed(file_path, x=x, y=y)
+        torch.save({"x": x, "y": y}, file_path, pickle_protocol=4)
 
     train_loader, val_loader, test_loader = get_dataloaders(x, y, batch_size=batch_size)
 
-    model = MFCCNN(num_cls=num_speakers).to(DEVICE)
     print("-------------", model._get_name(), "-------------")
 
     criterion = nn.CrossEntropyLoss()
@@ -266,10 +293,33 @@ if __name__ == "__main__":
         log=log_file,
     )
 
-    # model.test_phase()
     test_loss, test_acc = eval_model(model, test_loader, criterion)
     print("Test Loss = %.5f" % test_loss, "Test acc = %.5f " % test_acc)
-    with open(log_file, "a") as f:
-        print("Test Loss = %.5f" % test_loss, "Test acc = %.5f " % test_acc, file=f)
+    if log_file:
+        with open(log_file, "a") as f:
+            print("Test Loss = %.5f" % test_loss, "Test acc = %.5f " % test_acc, file=f)
 
-    torch.save(model.state_dict(), f"{model._get_name()}_state_dict.pt")
+    torch.save(
+        model.state_dict(),
+        f"./saved_model/{model._get_name()}_{num_speakers}_state_dict.pt",
+    )
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-m", type=str, required=True)
+    parser.add_argument("-n", type=int, required=False, default=250)
+    parser.add_argument("-g", type=int, required=True)
+
+    args = parser.parse_args()
+
+    GPU_ID = args.g
+    if torch.cuda.is_available():
+        DEVICE = torch.device(f"cuda:{GPU_ID}")
+    else:
+        DEVICE = torch.device("cpu")
+        
+    model_name = args.m
+    num_speakers = args.n
+
+    run(model_name, num_speakers=num_speakers)
