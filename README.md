@@ -6,5 +6,5 @@ AAI Project: Text-Independent Speaker Identification
 处理后的数据路径统一为 `<root>/data/`
 
 ```
-我是小崔
+我是小崔222
 ```
