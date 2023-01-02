@@ -251,6 +251,7 @@ def run(model_name: str, num_speakers=None):
         x = data_dict["x"]
         y = data_dict["y"]
     else:
+
         data_all = []
         for i in range(1, 1 + num_speakers):
             data_all.append(
@@ -374,7 +375,8 @@ def predict(model_name, file_list, save_path=None):
     if save_path:
         with open(save_path, "w") as f:
             for i in range(len(file_list)):
-                print(os.path.basename(file_list[i]), pred_labels[i], file=f)
+                pred_ans = f"spk{str(pred_labels[i]).zfill(3)}" 
+                print(os.path.basename(file_list[i]), pred_ans, file=f)
 
     return np.array(pred_labels)
 

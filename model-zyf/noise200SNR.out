@@ -1,0 +1,14 @@
+nohup: ignoring input
+use noise audio!
+2022-12-27 22:46:53.957750
+Loading cached data...
+Traceback (most recent call last):
+  File "train_cys.py", line 498, in <module>
+    run(model_name, num_speakers=num_speakers)
+  File "train_cys.py", line 257, in run
+    data_dict = torch.load(file_path)
+  File "/home/cuilab/miniconda3/envs/torch1.12/lib/python3.8/site-packages/torch/serialization.py", line 713, in load
+    return _legacy_load(opened_file, map_location, pickle_module, **pickle_load_args)
+  File "/home/cuilab/miniconda3/envs/torch1.12/lib/python3.8/site-packages/torch/serialization.py", line 920, in _legacy_load
+    magic_number = pickle_module.load(f, **pickle_load_args)
+EOFError: Ran out of input
